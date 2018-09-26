@@ -1,0 +1,958 @@
+# InspectorDemoEnv.yaml
+#
+# This CloudFormation template does the following:
+#
+# (1) creates a VPC with a single public subnet
+# (2) launches an Amazon EC2 instance for each Amazon Linux/Windows AMI
+# that supports Amazon Inspector
+# (3) Creates an Inspector resource group, target, and assessment
+# template for each of these instances based on the available rules packages
+# for the OS at the time this template was developed.  This will need to
+# be manually updated.
+#
+# This CloudFormation template does *not* do the following:
+#
+# (1) Run the Inspector assessments
+#
+
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: AWS Inspector Demo
+
+# Note the use of the AWS-specific parameter type.
+#
+# See:
+#
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - Label: 
+          default: "General Parameters"
+        Parameters: 
+        - AzName
+        - InstanceKeyPair
+        - TargetInstanceType
+        - ProjectTag
+        - SgAdminCidr
+      - Label:
+          default: "Choose instances to create"
+        Parameters:
+        - CreateAmazonLinux
+        - CreateAmazonLinux2
+        - CreateWindows2008R2
+        - CreateWindows2012
+        - CreateWindows2012R2
+        - CreateWindows2016
+      - Label: 
+          default: "Lastest AMI ID SSM filter (you should normally accept the default)"
+        Parameters: 
+        - AmazonLinuxAmiId
+        - AmazonLinux2AmiId
+        - Windows2008R2AmiId
+        - Windows2012AmiId
+        - Windows2012R2AmiId
+        - Windows2016AmiId
+
+Parameters:
+  AzName:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Subnet Availability Zone
+
+  InstanceKeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  TargetInstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Instance type for targets
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - t2.xlarge
+    - t2.2xlarge
+    - t3.nano
+    - t3.micro
+    - t3.small
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    - t3.2xlarge
+    - m4.large
+    - m4.xlarge
+    - m4.2xlarge
+    - m4.4xlarge
+    - m4.10xlarge
+    - m4.16xlarge
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - m5.4xlarge
+    - m5.12xlarge
+    - m5.24xlarge
+    - m5d.large
+    - m5d.xlarge
+    - m5d.2xlarge
+    - m5d.4xlarge
+    - m5d.12xlarge
+    - m5d.24xlarge
+    - c4.large
+    - c4.xlarge
+    - c4.2xlarge
+    - c4.4xlarge
+    - c4.8xlarge
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    - c5.4xlarge
+    - c5.9xlarge
+    - c5.18xlarge
+    - c5d.xlarge
+    - c5d.2xlarge
+    - c5d.4xlarge
+    - c5d.9xlarge
+    - c5d.18xlarge
+    - r4.large
+    - r4.xlarge
+    - r4.2xlarge
+    - r4.4xlarge
+    - r4.8xlarge
+    - r4.16xlarge
+    - r5.large
+    - r5.xlarge
+    - r5.2xlarge
+    - r5.4xlarge
+    - r5.12xlarge
+    - r5.24xlarge
+    - r5d.large
+    - r5d.xlarge
+    - r5d.2xlarge
+    - r5d.4xlarge
+    - r5d.12xlarge
+    - r5d.24xlarge
+    - x1.16xlarge
+    - x1.32xlarge
+    - x1e.xlarge
+    - x1e.2xlarge
+    - x1e.4xlarge
+    - x1e.8xlarge
+    - x1e.16xlarge
+    - x1e.32xlarge
+    - z1d.large
+    - z1d.xlarge
+    - z1d.2xlarge
+    - z1d.3xlarge
+    - z1d.6xlarge
+    - z1d.12xlarge
+    - d2.xlarge
+    - d2.2xlarge
+    - d2.4xlarge
+    - d2.8xlarge
+    - h1.2xlarge
+    - h1.4xlarge
+    - h1.8xlarge
+    - h1.16xlarge
+    - i3.large
+    - i3.xlarge
+    - i3.2xlarge
+    - i3.4xlarge
+    - i3.8xlarge
+    - i3.16xlarge
+    - i3.metal
+    - f1.2xlarge
+    - f1.4xlarge
+    - f1.16xlarge
+    - g3.4xlarge
+    - g3.8xlarge
+    - g3.16xlarge
+    - p2.xlarge
+    - p2.8xlarge
+    - p2.16xlarge
+    - p3.2xlarge
+    - p3.8xlarge
+    - p3.16xlarge
+
+  CreateAmazonLinux:
+    Type: String
+    Default: true
+    Description: Create Amazon Linux instance?
+    AllowedValues:
+    - true
+    - false
+
+  CreateAmazonLinux2:
+    Type: String
+    Default: true
+    Description: Create Amazon Linux 2 instance?
+    AllowedValues:
+    - true
+    - false
+
+  CreateWindows2008R2:
+    Type: String
+    Default: true
+    Description: Create Windows 2008 R2 instance?
+    AllowedValues:
+    - true
+    - false
+
+  CreateWindows2012:
+    Type: String
+    Default: true
+    Description: Create Windows 2012 instance?
+    AllowedValues:
+    - true
+    - false
+
+  CreateWindows2012R2:
+    Type: String
+    Default: true
+    Description: Create Windows 2012R2 instance?
+    AllowedValues:
+    - true
+    - false
+
+  CreateWindows2016:
+    Type: String
+    Default: true
+    Description: Create Windows 2016 instance?
+    AllowedValues:
+    - true
+    - false
+
+  ProjectTag:
+    Type: String
+    Description: Project tag (2-32 alphanumerics)
+    Default: InspectorDemo
+    MinLength: 2
+    MaxLength: 32
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+
+  SgAdminCidr:
+    Type: String
+    Description: The CIDR block for administering EC2 instances (default "uninitialized" 0.0.0.0/32)
+    MinLength: 9
+    MaxLength: 18
+    Default: "0.0.0.0/32"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x
+
+  AmazonLinuxAmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2'
+
+  AmazonLinux2AmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  Windows2008R2AmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2008-R2_SP1-English-64Bit-Base'
+
+  Windows2012AmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2012-RTM-English-64Bit-Base'
+
+  Windows2012R2AmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Base'
+
+  Windows2016AmiId:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: '/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base'
+
+Conditions: 
+  LaunchAmazonLinux: !Equals [ !Ref CreateAmazonLinux, true ]
+  LaunchAmazonLinux2: !Equals [ !Ref CreateAmazonLinux2, true ]
+  LaunchWindows2008R2: !Equals [ !Ref CreateWindows2008R2, true ]
+  LaunchWindows2012: !Equals [ !Ref CreateWindows2012, true ]
+  LaunchWindows2012R2: !Equals [ !Ref CreateWindows2012R2, true ]
+  LaunchWindows2016: !Equals [ !Ref CreateWindows2016, true ]
+
+Mappings:
+  RulesPackagesMap: 
+    us-west-2:
+      CVE: 'arn:aws:inspector:us-west-2:758058086616:rulespackage/0-9hgA516p'
+      CIS: 'arn:aws:inspector:us-west-2:758058086616:rulespackage/0-H5hpSawc'
+      SBP: 'arn:aws:inspector:us-west-2:758058086616:rulespackage/0-JJOtZiqQ'
+      RBA: 'arn:aws:inspector:us-west-2:758058086616:rulespackage/0-vg5GGHSD'
+    us-east-1:
+      CVE: 'arn:aws:inspector:us-east-1:316112463485:rulespackage/0-gEjTy7T7'
+      CIS: 'arn:aws:inspector:us-east-1:316112463485:rulespackage/0-rExsr2X8'
+      SBP: 'arn:aws:inspector:us-east-1:316112463485:rulespackage/0-R01qwB5Q'
+      RBA: 'arn:aws:inspector:us-east-1:316112463485:rulespackage/0-gBONHN9h'
+    us-east-2:
+      CVE: 'arn:aws:inspector:us-east-2:646659390643:rulespackage/0-JnA8Zp85'
+      CIS: 'arn:aws:inspector:us-east-2:646659390643:rulespackage/0-m8r61nnh'
+      SBP: 'arn:aws:inspector:us-east-2:646659390643:rulespackage/0-AxKmMHPX'
+      RBA: 'arn:aws:inspector:us-east-2:646659390643:rulespackage/0-UCYZFKPV'
+    us-west-1:
+      CVE: 'arn:aws:inspector:us-west-1:166987590008:rulespackage/0-TKgzoVOa'
+      CIS: 'arn:aws:inspector:us-west-1:166987590008:rulespackage/0-xUY8iRqX'
+      SBP: 'arn:aws:inspector:us-west-1:166987590008:rulespackage/0-byoQRFYm'
+      RBA: 'arn:aws:inspector:us-west-1:166987590008:rulespackage/0-yeYxlt0x'
+    ap-south-1:
+      CVE: 'arn:aws:inspector:ap-south-1:162588757376:rulespackage/0-LqnJE9dO'
+      CIS: 'arn:aws:inspector:ap-south-1:162588757376:rulespackage/0-PSUlX14m'
+      SBP: 'arn:aws:inspector:ap-south-1:162588757376:rulespackage/0-fs0IZZBj'
+      RBA: 'arn:aws:inspector:ap-south-1:162588757376:rulespackage/0-EhMQZy6C'
+    ap-southeast-2:
+      CVE: 'arn:aws:inspector:ap-southeast-2:454640832652:rulespackage/0-D5TGAxiR'
+      CIS: 'arn:aws:inspector:ap-southeast-2:454640832652:rulespackage/0-Vkd2Vxjq'
+      SBP: 'arn:aws:inspector:ap-southeast-2:454640832652:rulespackage/0-asL6HRgN'
+      RBA: 'arn:aws:inspector:ap-southeast-2:454640832652:rulespackage/0-P8Tel2Xj'
+    ap-northeast-2:
+      CVE: 'arn:aws:inspector:ap-northeast-2:526946625049:rulespackage/0-PoGHMznc'
+      CIS: 'arn:aws:inspector:ap-northeast-2:526946625049:rulespackage/0-T9srhg1z'
+      SBP: 'arn:aws:inspector:ap-northeast-2:526946625049:rulespackage/0-2WRpmi4n'
+      RBA: 'arn:aws:inspector:ap-northeast-2:526946625049:rulespackage/0-PoYq7lI7'
+    ap-northeast-1:
+      CVE: 'arn:aws:inspector:ap-northeast-1:406045910587:rulespackage/0-gHP9oWNT'
+      CIS: 'arn:aws:inspector:ap-northeast-1:406045910587:rulespackage/0-7WNjqgGu'
+      SBP: 'arn:aws:inspector:ap-northeast-1:406045910587:rulespackage/0-bBUQnxMq'
+      RBA: 'arn:aws:inspector:ap-northeast-1:406045910587:rulespackage/0-knGBhqEu'
+    eu-west-1:
+      CVE: 'arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-ubA5XvBh'
+      CIS: 'arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-sJBhCr0F'
+      SBP: 'arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-SnojL3Z6'
+      RBA: 'arn:aws:inspector:eu-west-1:357557129151:rulespackage/0-lLmwe1zd'
+    eu-central-1:
+      CVE: 'arn:aws:inspector:eu-central-1:537503971621:rulespackage/0-wNqHa8M9'
+      CIS: 'arn:aws:inspector:eu-central-1:537503971621:rulespackage/0-nZrAVuv8'
+      SBP: 'arn:aws:inspector:eu-central-1:537503971621:rulespackage/0-ZujVHEPB'
+      RBA: 'arn:aws:inspector:eu-central-1:537503971621:rulespackage/0-0GMUM6fg'
+    us-gov-west-1:
+      CVE: 'arn:aws-us-gov:inspector:us-gov-west-1:850862329162:rulespackage/0-4oQgcI4G'
+      CIS: 'arn:aws-us-gov:inspector:us-gov-west-1:850862329162:rulespackage/0-Ac4CFOuc'
+      SBP: 'arn:aws-us-gov:inspector:us-gov-west-1:850862329162:rulespackage/0-rOTGqe5G'
+      RBA: 'arn:aws-us-gov:inspector:us-gov-west-1:850862329162:rulespackage/0-JMyjuzoW'
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.200.0.0/16
+      EnableDnsHostnames: 'true'
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AzName
+      CidrBlock: 10.200.11.0/24
+      MapPublicIpOnLaunch: 'true'
+      VpcId: !Ref Vpc
+
+  VpcIgw:
+    Type: AWS::EC2::InternetGateway
+
+  VpcIgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref VpcIgw
+      VpcId: !Ref Vpc
+
+# Note the use of the DependsOn attribute.  You need to use this to delay
+# the creation of the route table if it contains a route that reports to
+# an Internet Gateway.
+#
+# See:
+#
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-dependson.html
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    DependsOn: VpcIgwAttachment
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref VpcIgw
+      RouteTableId: !Ref RouteTable
+
+  AssociatePublicSubnetToRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref PublicSubnet
+
+  RdpSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Enable RDP access via port 3389'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3389
+        ToPort: 3389
+        CidrIp: !Ref SgAdminCidr
+      VpcId: !Ref Vpc
+
+  SshSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Enable SSH access via port 22'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref SgAdminCidr
+      VpcId: !Ref Vpc
+
+# InstanceRole - The IAM role that will be attached to the Amazon EC2
+# instance.  We need to have the managed policies needed by both Amazon
+# Inspector and AWS Systems Manager.  Additional policies are included
+# for the CloudFormation helper scripts.
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonInspectorFullAccess
+      - arn:aws:iam::aws:policy/AmazonSSMFullAccess 
+      - arn:aws:iam::aws:policy/AWSConfigUserAccess
+      - arn:aws:iam::aws:policy/AWSHealthFullAccess
+      - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+      Policies:
+        - PolicyName: "root"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: "Allow"
+                Action:
+                -  cloudformation:SignalResource
+                -  cloudformation:DescribeStackResource
+                -  resource-groups:*
+                Resource: "*"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Path: '/'
+      Roles: 
+        - !Ref InstanceRole
+
+  AmazonLinuxInstance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchAmazonLinux
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AmazonLinuxAmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref SshSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Amazon Linux'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          /opt/aws/bin/cfn-signal \
+            -e $? \
+            --stack ${AWS::StackName} \
+            --resource AmazonLinuxInstance \
+            --region ${AWS::Region}
+
+  AmazonLinuxInspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchAmazonLinux
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Amazon Linux"
+
+  AmazonLinuxInspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchAmazonLinux
+    Properties: 
+      ResourceGroupArn: !GetAtt AmazonLinuxInspectorRG.Arn
+
+  AmazonLinuxOneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchAmazonLinux
+    Properties:
+      AssessmentTargetArn: !GetAtt AmazonLinuxInspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CIS]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', SBP]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Amazon Linux 2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmAmazonLinux:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchAmazonLinux
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref AmazonLinuxInstance
+
+  AmazonLinux2Instance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchAmazonLinux2
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref AmazonLinux2AmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref SshSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Amazon Linux 2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          /opt/aws/bin/cfn-signal \
+            -e $? \
+            --stack ${AWS::StackName} \
+            --resource AmazonLinux2Instance \
+            --region ${AWS::Region}
+
+  AmazonLinux2InspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchAmazonLinux2
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Amazon Linux 2"
+
+  AmazonLinux2InspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchAmazonLinux2
+    Properties: 
+      ResourceGroupArn: !GetAtt AmazonLinux2InspectorRG.Arn
+
+  AmazonLinux2OneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchAmazonLinux2
+    Properties:
+      AssessmentTargetArn: !GetAtt AmazonLinux2InspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', SBP]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Amazon Linux 2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmAmazonLinux2:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchAmazonLinux2
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref AmazonLinux2Instance
+
+  Windows2008R2Instance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchWindows2008R2
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          pagkages:
+            msi: https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-win64-latest.msi
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref Windows2008R2AmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref RdpSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Windows 2008 R2'
+      - Key: Project
+        Value: !Ref ProjectTag
+      UserData:
+        Fn::Base64: !Sub |
+          <script>
+          cfn-init.exe ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2008R2Instance ^
+          --region ${AWS::Region}
+          cfn-signal.exe ^
+          --exit-code %ERRORLEVEL% ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2008R2Instance ^
+          --region ${AWS::Region}
+          </script>
+
+  Windows2008R2InspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchWindows2008R2
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Windows 2008 R2"
+
+  Windows2008R2InspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchWindows2008R2
+    Properties: 
+      ResourceGroupArn: !GetAtt Windows2008R2InspectorRG.Arn
+
+  Windows2008R2OneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchWindows2008R2
+    Properties:
+      AssessmentTargetArn: !GetAtt Windows2008R2InspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CIS]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Windows 2008 R2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmWindows2008R2:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchWindows2008R2
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref Windows2008R2Instance
+
+  Windows2012Instance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchWindows2012
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          pagkages:
+            msi: https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-win64-latest.msi
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref Windows2012AmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref RdpSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Windows 2012'
+      - Key: Project
+        Value: !Ref ProjectTag
+      UserData:
+        Fn::Base64: !Sub |
+          <script>
+          cfn-init.exe ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2012Instance ^
+          --region ${AWS::Region}
+          cfn-signal.exe ^
+          --exit-code %ERRORLEVEL% ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2012Instance ^
+          --region ${AWS::Region}
+          </script>
+
+  Windows2012InspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchWindows2012
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Windows 2012"
+
+  Windows2012InspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchWindows2012
+    Properties: 
+      ResourceGroupArn: !GetAtt Windows2012InspectorRG.Arn
+
+  Windows2012OneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchWindows2012
+    Properties:
+      AssessmentTargetArn: !GetAtt Windows2012InspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CIS]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Windows 2012'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmWindows2012:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchWindows2012
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref Windows2012Instance
+
+  Windows2012R2Instance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchWindows2012R2
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          pagkages:
+            msi: https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-win64-latest.msi
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref Windows2012R2AmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref RdpSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Windows 2012 R2'
+      - Key: Project
+        Value: !Ref ProjectTag
+      UserData:
+        Fn::Base64: !Sub |
+          <script>
+          cfn-init.exe ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2012R2Instance ^
+          --region ${AWS::Region}
+          cfn-signal.exe ^
+          --exit-code %ERRORLEVEL% ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2012R2Instance ^
+          --region ${AWS::Region}
+          </script>
+
+  Windows2012R2InspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchWindows2012R2
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Windows 2012 R2"
+
+  Windows2012R2InspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchWindows2012R2
+    Properties: 
+      ResourceGroupArn: !GetAtt Windows2012R2InspectorRG.Arn
+
+  Windows2012R2OneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchWindows2012R2
+    Properties:
+      AssessmentTargetArn: !GetAtt Windows2012R2InspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CIS]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Windows 2012 R2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmWindows2012R2:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchWindows2012R2
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref Windows2012R2Instance
+
+  Windows2016Instance:
+    Type: AWS::EC2::Instance
+    Condition: LaunchWindows2016
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          pagkages:
+            msi: https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-win64-latest.msi
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      AvailabilityZone: !Ref AzName
+      IamInstanceProfile: !Ref InstanceProfile
+      ImageId: !Ref Windows2016AmiId
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref InstanceKeyPair
+      Monitoring: 'true'
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: 'true'
+        DeviceIndex: '0'
+        GroupSet:
+        - !Ref RdpSg
+        SubnetId: !Ref PublicSubnet
+      Tenancy: default
+      Tags:
+      - Key: Name
+        Value: 'ID Windows 2016'
+      - Key: Project
+        Value: !Ref ProjectTag
+      UserData:
+        Fn::Base64: !Sub |
+          <script>
+          cfn-init.exe ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2016Instance ^
+          --region ${AWS::Region}
+          cfn-signal.exe ^
+          --exit-code %ERRORLEVEL% ^
+          --stack ${AWS::StackId} ^
+          --resource Windows2016Instance ^
+          --region ${AWS::Region}
+          </script>
+
+  Windows2016InspectorRG:
+    Type: AWS::Inspector::ResourceGroup
+    Condition: LaunchWindows2016
+    Properties: 
+      ResourceGroupTags: 
+      - Key: "Name"
+        Value: "ID Windows 2016"
+
+  Windows2016InspectorTarget:
+    Type: AWS::Inspector::AssessmentTarget
+    Condition: LaunchWindows2016
+    Properties: 
+      ResourceGroupArn: !GetAtt Windows2016InspectorRG.Arn
+
+  Windows2016OneHourInspectorTemplate:
+    Type: AWS::Inspector::AssessmentTemplate
+    Condition: LaunchWindows2016
+    Properties:
+      AssessmentTargetArn: !GetAtt Windows2016InspectorTarget.Arn
+      DurationInSeconds: 3600
+      RulesPackageArns: 
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', CVE]
+        - !FindInMap [RulesPackagesMap, !Ref 'AWS::Region', RBA]
+      UserAttributesForFindings: 
+      - Key: 'Name'
+        Value: 'ID Amazon Linux 2'
+      - Key: Project
+        Value: !Ref ProjectTag
+
+  AssociateSsmWindows2016:
+    Type: "AWS::SSM::Association"
+    Condition: LaunchWindows2016
+    Properties: 
+      Name: AmazonInspector-ManageAWSAgent
+      Parameters:
+        Operation:
+        - Install
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref Windows2016Instance
