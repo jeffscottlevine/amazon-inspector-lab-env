@@ -1,4 +1,4 @@
-This repository creates a demo environment for Amazon Inspector.  It creates
+The Amazon CloudFormation template in this repository creates a demo environment for Amazon Inspector.  It creates
 a VPC with a public subnet and then sets up Amazon EC2 instances with the
 supported Windows and Amazon Linux OS variants along with the Amazon
 Inspector target groups and templates.  It does not start the actual
