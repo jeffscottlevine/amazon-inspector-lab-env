@@ -338,6 +338,12 @@ Resources:
     Properties:
       CidrBlock: 10.200.0.0/16
       EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
+
 
   PublicSubnet:
     Type: AWS::EC2::Subnet
@@ -346,9 +352,21 @@ Resources:
       CidrBlock: 10.200.11.0/24
       MapPublicIpOnLaunch: 'true'
       VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
 
   VpcIgw:
     Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
+
 
   VpcIgwAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -369,6 +387,12 @@ Resources:
     DependsOn: VpcIgwAttachment
     Properties:
       VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
+
 
   DefaultRoute:
     Type: AWS::EC2::Route
@@ -393,6 +417,12 @@ Resources:
         ToPort: 3389
         CidrIp: !Ref SgAdminCidr
       VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
+
 
   SshSg:
     Type: AWS::EC2::SecurityGroup
@@ -404,6 +434,12 @@ Resources:
         ToPort: 22
         CidrIp: !Ref SgAdminCidr
       VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: 'InspectorDemo'
+      - Key: Project
+        Value: !Ref ProjectTag
+
 
 # InstanceRole - The IAM role that will be attached to the Amazon EC2
 # instance.  We need to have the managed policies needed by both Amazon
